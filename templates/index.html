@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance Manager</title>
+    <link rel="stylesheet" href="/static/index.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    
+    <div class="app-wrapper">
+        <nav class="sidebar">
+            <div class="brand">
+                <span>Classroom</span>
+            </div>
+            
+            <div class="nav-links">
+                <button class="nav-btn active" onclick="switchTab('mark-tab', this)">
+                    <span>Mark Attendance</span>
+                </button>
+                <button class="nav-btn" onclick="switchTab('history-tab', this)">
+                    <span>View History</span>
+                </button>
+                <button class="nav-btn" onclick="switchTab('students-tab', this)">
+                    <span>Manage Students</span>
+                </button>
+            </div>
+        </nav>
+
+        <main class="content-area">
+            
+            <section id="mark-tab" class="view-section active">
+                <header class="section-header">
+                    <div>
+                        <h1>Daily Attendance</h1>
+                        <p>Mark students present for the day.</p>
+                    </div>
+                    <div class="date-picker-wrapper">
+                        <input type="date" id="mark-date" class="date-input">
+                    </div>
+                </header>
+
+                <div class="card">
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th width="50">Status</th>
+                                    <th>Roll No</th>
+                                    <th>Student Name</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="mark-table-body">
+                                </tbody>
+                        </table>
+                    </div>
+                    <div class="card-footer">
+                        <button class="btn btn-primary" onclick="saveAttendance()">Save Attendance</button>
+                    </div>
+                </div>
+            </section>
+
+            <section id="history-tab" class="view-section">
+                <header class="section-header">
+                    <div>
+                        <h1>Attendance Records</h1>
+                        <p>View past attendance logs.</p>
+                    </div>
+                    <div class="date-picker-wrapper">
+                        <label>Filter Date:</label>
+                        <input type="date" id="history-date" class="date-input" onchange="loadHistory()">
+                    </div>
+                </header>
+
+                <div class="card">
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Roll No</th>
+                                    <th>Student Name</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-table-body">
+                                <tr><td colspan="3" class="text-center">Select a date to view records</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <section id="students-tab" class="view-section">
+                <header class="section-header">
+                    <h1>Student Registry</h1>
+                </header>
+
+                <div class="grid-layout">
+                    <div class="card form-card">
+                        <h3>Add New Student</h3>
+                        <div class="form-group">
+                            <label>Full Name</label>
+                            <input type="text" id="new-name" placeholder="John Doe">
+                        </div>
+                        <div class="form-group">
+                            <label>Roll Number</label>
+                            <input type="text" id="new-roll" placeholder="101">
+                        </div>
+                        <button class="btn btn-primary full-width" onclick="addStudent()">Add Student</button>
+                    </div>
+
+                    <div class="card list-card">
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Roll</th>
+                                        <th>Name</th>
+                                        <th align="right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="students-list-body">
+                                    </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div id="toast" class="toast">Action Successful</div>
+
+    <script>
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('mark-date').value = today;
+        document.getElementById('history-date').value = today;
+
+        function switchTab(tabId, btn) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+            
+            document.getElementById(tabId).classList.add('active');
+            btn.classList.add('active');
+
+            if(tabId === 'mark-tab') loadMarkingTable();
+            if(tabId === 'students-tab') loadStudentsManager();
+            if(tabId === 'history-tab') loadHistory();
+        }
+
+        async function loadMarkingTable() {
+            const date = document.getElementById('mark-date').value;
+            const response = await fetch(`/api/attendance/${date}`);
+            const data = await response.json();
+            
+            const tbody = document.getElementById('mark-table-body');
+            tbody.innerHTML = '';
+
+            data.forEach(student => {
+                const isChecked = student.is_present === 1 ? 'checked' : '';
+                const rowClass = isChecked ? 'row-selected' : '';
+                
+                const row = `
+                    <tr class="${rowClass}" id="row-${student.id}">
+                        <td>
+                            <input type="checkbox" class="status-check" 
+                                   data-id="${student.id}" 
+                                   ${isChecked} 
+                                   onchange="toggleRowStyle(this)">
+                        </td>
+                        <td class="font-mono">${student.roll_number}</td>
+                        <td class="font-medium">${student.name}</td>
+                        <td><span class="badge ${isChecked ? 'present' : 'absent'}">${isChecked ? 'Present' : 'Absent'}</span></td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+        }
+
+        function toggleRowStyle(checkbox) {
+            const row = document.getElementById(`row-${checkbox.dataset.id}`);
+            const badge = row.querySelector('.badge');
+            
+            if (checkbox.checked) {
+                row.classList.add('row-selected');
+                badge.className = 'badge present';
+                badge.innerText = 'Present';
+            } else {
+                row.classList.remove('row-selected');
+                badge.className = 'badge absent';
+                badge.innerText = 'Absent';
+            }
+        }
+
+        async function saveAttendance() {
+            const date = document.getElementById('mark-date').value;
+            const checkboxes = document.querySelectorAll('.status-check:checked');
+            const presentIds = Array.from(checkboxes).map(cb => parseInt(cb.dataset.id));
+
+            const response = await fetch('/api/attendance', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ date: date, present_ids: presentIds })
+            });
+
+            if(response.ok) showToast('Attendance saved successfully!');
+        }
+
+        async function loadHistory() {
+            const date = document.getElementById('history-date').value;
+            const tbody = document.getElementById('history-table-body');
+            
+            if(!date) return;
+
+            const response = await fetch(`/api/attendance/${date}`);
+            const data = await response.json();
+
+            tbody.innerHTML = '';
+            
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center">No records found</td></tr>';
+                return;
+            }
+
+            data.forEach(student => {
+                let statusBadge;
+                if (student.is_present === 1) statusBadge = '<span class="badge present">Present</span>';
+                else if (student.is_present === 0) statusBadge = '<span class="badge absent">Absent</span>';
+                else statusBadge = '<span class="badge pending">Not Marked</span>';
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="font-mono">${student.roll_number}</td>
+                        <td>${student.name}</td>
+                        <td>${statusBadge}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function loadStudentsManager() {
+            const response = await fetch('/api/students');
+            const students = await response.json();
+            const tbody = document.getElementById('students-list-body');
+            tbody.innerHTML = '';
+
+            students.forEach(s => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="font-mono">${s.roll_number}</td>
+                        <td class="font-medium">${s.name}</td>
+                        <td align="right">
+                            <button class="btn-icon danger" onclick="deleteStudent(${s.id})">🗑️</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function addStudent() {
+            const name = document.getElementById('new-name').value;
+            const roll = document.getElementById('new-roll').value;
+
+            if(!name || !roll) return alert('Please fill all fields');
+
+            const response = await fetch('/api/students', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ name: name, roll_number: roll })
+            });
+
+            if(response.ok) {
+                document.getElementById('new-name').value = '';
+                document.getElementById('new-roll').value = '';
+                loadStudentsManager();
+                showToast('Student added!');
+            }
+        }
+
+        async function deleteStudent(id) {
+            if(!confirm('Delete this student?')) return;
+            const response = await fetch(`/api/students/${id}`, { method: 'DELETE' });
+            if(response.ok) loadStudentsManager();
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
+
+        loadMarkingTable();
+        
+        document.getElementById('mark-date').addEventListener('change', loadMarkingTable);
+
+    </script>
+</body>
+</html>
