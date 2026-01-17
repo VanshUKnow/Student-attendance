@@ -4,10 +4,9 @@ import MySQLdb.cursors
 
 app = Flask(__name__)
 
-# Database Configuration
 app.config['MYSQL_HOST'] = 'localhost'
 app.config['MYSQL_USER'] = 'root'
-app.config['MYSQL_PASSWORD'] = 'root1234'  # Update with your password
+app.config['MYSQL_PASSWORD'] = 'root1234'
 app.config['MYSQL_DB'] = 'student_attendance'
 
 mysql = MySQL(app)
@@ -57,12 +56,10 @@ def mark_attendance():
     try:
         data = request.json
         date = data['date']
-        # List of IDs who are present
         present_ids = set(data['present_ids']) 
         
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
-        # Get all students to ensure we mark absentees too
         cursor.execute("SELECT id FROM students")
         all_students = cursor.fetchall()
         
@@ -70,7 +67,6 @@ def mark_attendance():
             s_id = student['id']
             is_present = 1 if s_id in present_ids else 0
             
-            # Upsert (Insert or Update if exists)
             cursor.execute("""
                 INSERT INTO attendance (student_id, attendance_date, is_present)
                 VALUES (%s, %s, %s)
@@ -88,7 +84,6 @@ def mark_attendance():
 def get_attendance(date):
     try:
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        # Left join ensures we see all students, even if no record exists yet (null check handled in frontend)
         query = """
             SELECT s.id, s.name, s.roll_number, a.is_present 
             FROM students s
